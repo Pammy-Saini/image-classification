@@ -242,18 +242,30 @@ The application generates:
 
 ---
 
+# 📸 Screenshots
+
+## Home Page
+
+![Home Page](screenshots/frame0.png)
+
+---
 
 ## Classification Result
 
-_Add Screenshot Here_
+![Classification Result](screenshots/frame1.png)
 
 ---
 
 ## Change Detection
 
-_Add Screenshot Here_
+![Change Detection](screenshots/frame2.png)
 
 ---
+
+## Dashboard / Statistics
+
+![Dashboard](screenshots/frame3.png)
+
 
 ## Future Improvements
 

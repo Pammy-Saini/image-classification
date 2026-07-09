@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Satellite Image Classification & Analysis Dashboard</title>
+    <meta name="description" content="An advanced interactive platform for satellite image processing, machine learning classification, and spatial change detection in Jodhpur and Jalore using IRS-LISS-3 data.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-logo">
+                    <i class="fa-solid fa-satellite-dish"></i>
+                </div>
+                <div class="brand-info">
+                    <h2>GeoClassifier</h2>
+                    <span>Machine Learning GIS</span>
+                </div>
+            </div>
+            <nav class="nav-menu">
+                <button class="nav-item active" data-tab="dashboard" id="btn-tab-dashboard">
+                    <i class="fa-solid fa-chart-line"></i> Dashboard
+                </button>
+                <button class="nav-item" data-tab="change" id="btn-tab-change">
+                    <i class="fa-solid fa-clock-rotate-left"></i> Change Detection
+                </button>
+                <button class="nav-item" data-tab="report" id="btn-tab-report">
+                    <i class="fa-solid fa-book-open"></i> Project Report
+                </button>
+                <button class="nav-item" data-tab="qgis" id="btn-tab-qgis">
+                    <i class="fa-solid fa-map-location-dot"></i> QGIS Tutorial
+                </button>
+            </nav>
+            <div class="controls-panel">
+                <h3><i class="fa-solid fa-sliders"></i> Configuration</h3>
+                
+                <!-- Region Select -->
+                <div class="control-group">
+                    <label for="select-region">Study Region</label>
+                    <select id="select-region">
+                        <option value="jodhpur">Jodhpur (Desert / Urban)</option>
+                        <option value="jalore">Jalore (Granite Hills / Riverbed)</option>
+                    </select>
+                </div>
+                <!-- Year Select -->
+                <div class="control-group" id="year-control">
+                    <label for="select-year">Acquisition Year</label>
+                    <select id="select-year">
+                        <option value="2024">March 2024 (Baseline)</option>
+                        <option value="2025">March 2025 (Temporal)</option>
+                    </select>
+                </div>
+                <!-- Algorithm Select -->
+                <div class="control-group">
+                    <label for="select-algo">Classification Model</label>
+                    <select id="select-algo">
+                        <optgroup label="Supervised (Machine Learning)">
+                            <option value="random_forest" selected>Random Forest Classifier</option>
+                            <option value="svm">Support Vector Machine (SVM)</option>
+                        </optgroup>
+                        <optgroup label="Unsupervised (Clustering)">
+                            <option value="kmeans">K-Means Clustering</option>
+                        </optgroup>
+                    </select>
+                </div>
+                <!-- Dynamic Parameters -->
+                <div class="control-group parameter-block" id="param-kmeans" style="display: none;">
+                    <label for="input-k">Number of Clusters (K)</label>
+                    <div class="range-slider">
+                        <input type="range" id="input-k" min="3" max="8" value="5">
+                        <span class="range-value" id="k-value">5</span>
+                    </div>
+                </div>
+                <div class="control-group parameter-block" id="param-rf">
+                    <label for="input-estimators">Estimators (Trees)</label>
+                    <div class="range-slider">
+                        <input type="range" id="input-estimators" min="10" max="150" step="10" value="50">
+                        <span class="range-value" id="rf-value">50</span>
+                    </div>
+                </div>
+                <div class="control-group parameter-block" id="param-svm" style="display: none;">
+                    <label for="input-svm-c">Regularization (C)</label>
+                    <select id="input-svm-c">
+                        <option value="0.1">0.1 (Soft Margin)</option>
+                        <option value="1.0" selected>1.0 (Standard)</option>
+                        <option value="10.0">10.0 (Hard Margin)</option>
+                    </select>
+                </div>
+                <!-- Execute Buttons -->
+                <button class="btn btn-primary" id="btn-run-classification">
+                    <i class="fa-solid fa-play"></i> Run Classification
+                </button>
+            </div>
+            
+            <div class="sidebar-footer">
+                <p>Sensor: IRS-LISS-3</p>
+                <p>Resolution: 23.5m</p>
+                <p>Sources: Bhuvan & Bhunidhi</p>
+            </div>
+        </aside>
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="content-header">
+                <div class="header-title">
+                    <h1 id="page-title">Satellite Image Classification</h1>
+                    <p id="page-subtitle">Multi-band image processing and machine learning analysis</p>
+                </div>
+                <div class="header-actions">
+                    <div class="status-indicator">
+                        <span class="pulse-dot"></span>
+                        <span id="status-text">System Idle</span>
+                    </div>
+                </div>
+            </header>
+            <!-- Dashboard Tab -->
+            <section class="tab-content active" id="tab-dashboard">
+                <div class="dashboard-grid">
+                    <!-- Viewer Card -->
+                    <div class="card viewer-card">
+                        <div class="card-header">
+                            <h3><i class="fa-solid fa-eye"></i> Multi-Band Visualizer</h3>
+                            <div class="view-toggles">
+                                <button class="btn-toggle active" data-view="tcc" id="btn-view-tcc">True Color (TCC)</button>
+                                <button class="btn-toggle" data-view="fcc" id="btn-view-fcc">False Color (FCC)</button>
+                                <button class="btn-toggle" data-view="bands" id="btn-view-bands">Bands</button>
+                            </div>
+                        </div>
+                        <div class="visualizer-container">
+                            <div class="view-panel">
+                                <span class="view-label">IRS-LISS-3 Original</span>
+                                <div class="image-wrapper">
+                                    <img id="img-source" src="" alt="Satellite Image Composite">
+                                    <div class="band-selectors" style="display: none;" id="div-band-selectors">
+                                        <button class="band-btn active" data-band="green">Green (B2)</button>
+                                        <button class="band-btn" data-band="red">Red (B3)</button>
+                                        <button class="band-btn" data-band="nir">NIR (B4)</button>
+                                        <button class="band-btn" data-band="swir">SWIR (B5)</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="view-panel">
+                                <span class="view-label">Classified Land Cover</span>
+                                <div class="image-wrapper">
+                                    <div id="classification-overlay" class="loading-overlay" style="display: none;">
+                                        <i class="fa-solid fa-circle-notch fa-spin"></i>
+                                        <span>Classifying Pixels...</span>
+                                    </div>
+                                    <canvas id="canvas-classified" width="256" height="256"></canvas>
+                                    <div class="no-data-msg" id="msg-no-classification">
+                                        <i class="fa-solid fa-brain"></i>
+                                        <p>Run ML Classification to generate map</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Legend Card -->
+                    <div class="card legend-card">
+                        <div class="card-header">
+                            <h3><i class="fa-solid fa-list-ul"></i> Land Cover Legend</h3>
+                        </div>
+                        <div class="legend-list" id="legend-container">
+                            <!-- Populated by JS -->
+                            <div class="legend-item"><span class="legend-color" style="background-color: #233;"></span> Water Body</div>
+                        </div>
+                    </div>
+                    <!-- Statistics Card -->
+                    <div class="card stats-card">
+                        <div class="card-header">
+                            <h3><i class="fa-solid fa-chart-pie"></i> Area Distribution</h3>
+                        </div>
+                        <div class="stats-container">
+                            <div class="chart-wrapper">
+                                <canvas id="chart-area-pie"></canvas>
+                            </div>
+                            <div class="table-wrapper">
+                                <table id="table-metrics">
+                                    <thead>
+                                        <tr>
+                                            <th>Class</th>
+                                            <th>Coverage %</th>
+                                            <th>Area (ha)</th>
+                                            <th>Area (km²)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Populated by JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <!-- Change Detection Tab -->
+            <section class="tab-content" id="tab-change">
+                <div class="change-grid">
+                    <!-- Dual Maps -->
+                    <div class="card dual-map-card">
+                        <div class="card-header">
+                            <h3><i class="fa-solid fa-clock"></i> Spatiotemporal Comparison (2024 vs 2025)</h3>
+                            <button class="btn btn-secondary" id="btn-run-change">
+                                <i class="fa-solid fa-rotate"></i> Compute Change
+                            </button>
+                        </div>
+                        <div class="dual-viewer-container">
+                            <div class="view-panel">
+                                <span class="view-label">2024 Classification</span>
+                                <div class="image-wrapper">
+                                    <img id="img-change-2024" src="" alt="2024 Classified Map" style="display: none;">
+                                    <div class="no-data-msg" id="msg-no-change-24">
+                                        <i class="fa-solid fa-map"></i>
+                                        <p>Trigger Change Detection to view</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="view-panel">
+                                <span class="view-label">2025 Classification</span>
+                                <div class="image-wrapper">
+                                    <img id="img-change-2025" src="" alt="2025 Classified Map" style="display: none;">
+                                    <div class="no-data-msg" id="msg-no-change-25">
+                                        <i class="fa-solid fa-map"></i>
+                                        <p>Trigger Change Detection to view</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Net Change Charts -->
+                    <div class="card change-charts-card">
+                        <div class="card-header">
+                            <h3><i class="fa-solid fa-arrow-trend-up"></i> Net Hectare Variance</h3>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="chart-net-change"></canvas>
+                        </div>
+                    </div>
+                    <!-- Transition Matrix Card -->
+                    <div class="card matrix-card">
+                        <div class="card-header">
+                            <h3><i class="fa-solid fa-table-cells"></i> Land Cover Transition Matrix (hectares)</h3>
+                        </div>
+                        <div class="table-wrapper">
+                            <table id="table-transition">
+                                <thead>
+                                    <!-- Populated dynamically by JS -->
+                                </thead>
+                                <tbody>
+                                    <!-- Populated dynamically by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="table-caption">* Rows indicate 2024 baseline classes, Columns indicate 2025 destination classes. Diagonals show unchanged area.</p>
+                    </div>
+                </div>
+            </section>
+            <!-- Academic Report Tab -->
+            <section class="tab-content" id="tab-report">
+                <div class="report-card card">
+                    <div class="report-actions">
+                        <button class="btn btn-secondary" onclick="window.print()">
+                            <i class="fa-solid fa-print"></i> Export / Print PDF
+                        </button>
+                    </div>
+                    <div class="report-document" id="printable-report">
+                        <div class="report-title-block">
+                            <span>ACADEMIC PROJECT REPORT</span>
+                            <h1>Image Processing and Classification using Machine Learning Techniques</h1>
+                            <div class="report-meta">
+                                <span><strong>Subject:</strong> Remote Sensing & GIS Application</span>
+                                <span><strong>Study Regions:</strong> Jodhpur & Jalore (Rajasthan)</span>
+                                <span><strong>Sensors:</strong> IRS-LISS-3 (ISRO Bhuvan/Bhunidhi)</span>
+                            </div>
+                        </div>
+                        <hr class="report-divider">
+                        <!-- Chapter 1 -->
+                        <article class="report-chapter">
+                            <h2>Chapter 1: Remote Sensing</h2>
+                            
+                            <section class="report-section">
+                                <h3>1.1 Introduction</h3>
+                                <p>Remote sensing is the science and art of obtaining information about an object, area, or phenomenon through the analysis of data acquired by a device that is not in physical contact with the object under investigation. It relies on the measurement of Electromagnetic Radiation (EMR) reflected, emitted, or scattered from the Earth's surface.</p>
+                                <p>The system operates using sensor platforms (satellites, aircraft, UAVs) which capture spectral data in specific wavelengths. For optical remote sensing, the sun serves as the primary source of illumination, and surface features absorb and reflect EMR differently depending on their physical and chemical properties.</p>
+                            </section>
+                            <section class="report-section">
+                                <h3>1.2 History and Remote Sensing</h3>
+                                <p>The evolution of remote sensing spans over a century:</p>
+                                <ul>
+                                    <li><strong>Early Beginnings (Mid-19th Century):</strong> Aerial photography using balloons, kites, and pigeons (e.g., Gaspard-Félix Tournachon's photography of Paris in 1858).</li>
+                                    <li><strong>World War Eras:</strong> Major advancements in military aerial reconnaissance, photo-interpretation keys, and the development of infrared films.</li>
+                                    <li><strong>The Satellite Era (1970s):</strong> The launch of Landsat-1 (originally ERTS-1) in 1972 by NASA revolutionized earth observation by providing systematic, repetitive multispectral imaging.</li>
+                                    <li><strong>Indian Satellite Milestones:</strong> ISRO launched its first operational Earth Observation Satellite, IRS-1A, in 1988. This was followed by highly advanced systems including the IRS-1C/1D and the Resourcesat series (Resourcesat-1/2/2A) carrying the Linear Imaging Self-Scanning Sensor (LISS-3) which provides 23.5m spatial resolution and spectral bands optimized for vegetation and geology.</li>
+                                </ul>
+                            </section>
+                            <section class="report-section">
+                                <h3>1.3 Types of Remote Sensing</h3>
+                                <p>Remote sensing is broadly categorized into two major types based on the source of energy utilized:</p>
+                                <table class="comparison-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Parameter</th>
+                                            <th>Passive Remote Sensing</th>
+                                            <th>Active Remote Sensing</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td><strong>Energy Source</strong></td>
+                                            <td>External (Natural EMR from Sun or thermal emission from Earth)</td>
+                                            <td>Internal (Sensor transmits its own electromagnetic pulse)</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Operational Limitations</strong></td>
+                                            <td>Daylight dependency (for optical sensors); blocked by cloud cover</td>
+                                            <td>Day and night operation; can penetrate clouds and light rain</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Wavelength Range</strong></td>
+                                            <td>Visible, Near-Infrared (NIR), Shortwave Infrared (SWIR), Thermal Infrared (TIR)</td>
+                                            <td>Microwave (Radar, SAR), Light pulses (LiDAR)</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Key Applications</strong></td>
+                                            <td>Vegetation mapping, water quality, urban mapping, surface temperature</td>
+                                            <td>Digital Elevation Models (DEMs), forest biomass structure, sea-ice tracking</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </section>
+                            <section class="report-section">
+                                <h3>1.4 Application of Remote Sensing</h3>
+                                <p>Earth observation data serves crucial fields:</p>
+                                <ul>
+                                    <li><strong>Agriculture & Soil:</strong> Crop yield estimation, crop health monitoring using indices like NDVI, and identification of salt-affected soils.</li>
+                                    <li><strong>Forestry & Ecology:</strong> Forest cover mapping, monitoring deforestation, species identification, and forest fire hazard mapping.</li>
+                                    <li><strong>Urban Planning:</strong> Built-up area extraction, urban sprawl monitoring, utility planning, and land-use/land-cover (LULC) changes.</li>
+                                    <li><strong>Water Resources:</strong> Delineation of surface water bodies, water quality analysis, snowmelt runoff estimation, and reservoir capacity monitoring.</li>
+                                    <li><strong>Geology & Geomorphology:</strong> Lithological mapping, mineral exploration, structural geology studies, and landslide vulnerability assessment.</li>
+                                </ul>
+                            </section>
+                        </article>
+                        <!-- Chapter 2 -->
+                        <article class="report-chapter">
+                            <h2>Chapter 2: Image Processing</h2>
+                            
+                            <section class="report-section">
+                                <h3>2.1 Image</h3>
+                                <p>A digital satellite image is represented by a two-dimensional grid of pixels (picture elements) arranged in columns and rows. Each pixel contains a numeric value called the Digital Number (DN) which represents the electromagnetic intensity measured by the detector. Multiple spectral bands stacked together form a multispectral image, representing spatial features across different parts of the spectrum.</p>
+                                <p>Key resolutions in satellite imagery include:</p>
+                                <ul>
+                                    <li><strong>Spatial Resolution:</strong> The size of the smallest area on the ground represented by a pixel (e.g., 23.5m for IRS-LISS-3, 10m for Sentinel-2).</li>
+                                    <li><strong>Spectral Resolution:</strong> The number and width of spectral bands in the sensor.</li>
+                                    <li><strong>Radiometric Resolution:</strong> The bit depth of the sensor, defining the sensitivity to differences in signal strength (e.g., 8-bit = 256 gray levels, 12-bit = 4096 levels).</li>
+                                    <li><strong>Temporal Resolution:</strong> The revisit time of the satellite to a particular location (e.g., 24 days for IRS-1C).</li>
+                                </ul>
+                            </section>
+                            <section class="report-section">
+                                <h3>2.2 Image Interpretation Key</h3>
+                                <p>Image interpretation keys help interpreters identify objects visually on satellite images. There are 8 standard elements:</p>
+                                <ol>
+                                    <li><strong>Tone/Color:</strong> Relates to the brightness or color of light reflected. Water appears dark (absorbs light), sand appears bright (reflects highly).</li>
+                                    <li><strong>Size:</strong> Relative and absolute dimensions of objects (e.g., small houses vs. large industrial sheds).</li>
+                                    <li><strong>Shape:</strong> Geometric form or outline (e.g., circular agricultural center-pivots, linear roads).</li>
+                                    <li><strong>Texture:</strong> Frequency of tonal change, described as rough, smooth, or mottled (e.g., forests have rough texture, calm water bodies have smooth texture).</li>
+                                    <li><strong>Pattern:</strong> Spatial arrangement of objects (e.g., orchard trees in rows vs. wild scattered trees).</li>
+                                    <li><strong>Shadow:</strong> Provides information on heights of features and relief (e.g., building shadows, mountain shadows).</li>
+                                    <li><strong>Association:</strong> Relation of a feature to other nearby features (e.g., school buildings next to playgrounds, docks next to water bodies).</li>
+                                    <li><strong>Site:</strong> Topographic or geographic location (e.g., vegetation thriving near riverbeds).</li>
+                                </ol>
+                            </section>
+                            <section class="report-section">
+                                <h3>2.3 Satellite Image</h3>
+                                <p>This project utilizes imagery from the <strong>Indian Remote Sensing (IRS) LISS-3</strong> sensor. IRS-LISS-3 operates in four spectral bands:</p>
+                                <ul>
+                                    <li><strong>Band 2 (Green):</strong> 0.52 - 0.59 µm (ideal for assessing vegetation health and water sedimentation).</li>
+                                    <li><strong>Band 3 (Red):</strong> 0.62 - 0.68 µm (high chlorophyll absorption, good for distinguishing soil from vegetation).</li>
+                                    <li><strong>Band 4 (Near Infrared / NIR):</strong> 0.77 - 0.86 µm (very high reflection in healthy vegetation, absorption in water bodies).</li>
+                                    <li><strong>Band 5 (Shortwave Infrared / SWIR):</strong> 1.55 - 1.70 µm (highly sensitive to plant leaf moisture and soil moisture content).</li>
+                                </ul>
+                                <p>To visualize this data, two common combinations are used:</p>
+                                <ul>
+                                    <li><strong>False Color Composite (FCC):</strong> Formed by mapping Band 4 (NIR) to Red, Band 3 (Red) to Green, and Band 2 (Green) to Blue. In an FCC, vegetation appears bright red, water bodies dark blue/black, built-up areas cyan/grey, and sand/bare soil bright white.</li>
+                                    <li><strong>True Color Composite (TCC):</strong> Emulates normal human vision (Red, Green, Blue). Because LISS-3 lacks a Blue band, true color representation requires synthesizing a Blue band through algorithm combinations of the Green, Red, and SWIR bands to match natural colors.</li>
+                                </ul>
+                            </section>
+                            <section class="report-section">
+                                <h3>2.4 Image Classification</h3>
+                                <p>Image classification is the process of sorting pixels into land-use/land-cover (LULC) classes based on their spectral response values. It is categorised into supervised and unsupervised techniques:</p>
+                                
+                                <div class="sub-section">
+                                    <h4>A. Unsupervised Classification</h4>
+                                    <p>Unsupervised classification requires no training data. The algorithm automatically clusters pixels based on spectral distances. The most common algorithm is <strong>K-Means</strong>. It starts with seed points, assigns pixels to the nearest cluster center, calculates new centers, and iterates until convergence. After clustering, the interpreter must inspect and assign a thematic class label to each spectral cluster.</p>
+                                    <p>The mathematical objective function minimized is:</p>
+                                    <div class="equation">
+                                        $$J = \sum_{j=1}^{K} \sum_{i=1}^{n} ||x_i^{(j)} - c_j||^2$$
+                                    </div>
+                                </div>
+                                <div class="sub-section">
+                                    <h4>B. Supervised Classification</h4>
+                                    <p>Supervised classification requires the interpreter to define Training Areas or Regions of Interest (ROIs). The spectral signatures of these ROIs are analyzed, and a machine learning classifier is trained. The trained model is then applied to classify all other pixels. Popular algorithms include:</p>
+                                    <ul>
+                                        <li><strong>Random Forest (RF):</strong> An ensemble learning method that constructs a multitude of decision trees and outputs the mode class of individual trees. It is highly robust to noise and high-dimensional data.</li>
+                                        <li><strong>Support Vector Machine (SVM):</strong> A non-parametric classifier that seeks to find the optimal hyperplane maximizing the margin between different land cover classes.</li>
+                                    </ul>
+                                </div>
+                                <div class="sub-section">
+                                    <h4>C. Difference Between Supervised and Unsupervised Classification</h4>
+                                    <table class="comparison-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Feature</th>
+                                                <th>Supervised Classification</th>
+                                                <th>Unsupervised Classification</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td><strong>Prior Knowledge</strong></td>
+                                                <td>Requires predefined training samples (ROIs) from ground truth.</td>
+                                                <td>Requires no prior knowledge of classes; groups by statistical variance.</td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>User Control</strong></td>
+                                                <td>High control over the output classes and naming convention.</td>
+                                                <td>Minimal control; user must manually map clusters to classes post-process.</td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Error Propagations</strong></td>
+                                                <td>Training sample selection errors propagate directly to the final map.</td>
+                                                <td>Clusters may represent mixed spectral classes, making mapping ambiguous.</td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Computational Cost</strong></td>
+                                                <td>Lower runtime for classification (but high preparation time for ROIs).</td>
+                                                <td>High iterative runtime for clustering algorithms.</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </section>
+                        </article>
+                        <!-- Chapter 3 -->
+                        <article class="report-chapter">
+                            <h2>Chapter 3: Image Classification Result</h2>
+                            
+                            <section class="report-section">
+                                <h3>3.1 Study Areas and Geographic Profile</h3>
+                                <p>This project examines two geographically distinct regions in Rajasthan, India, using simulated IRS-LISS-3 data corresponding to 2024 and 2025:</p>
+                                <ul>
+                                    <li><strong>Jodhpur (The Blue City):</strong> Located at the edge of the Thar Desert. Characterized by low annual rainfall, sandy dunes, scattered rocky ridges (Mehrangarh, Kaylana), and rapid urban growth expanding into desert terrain.</li>
+                                    <li><strong>Jalore (The Granite City):</strong> Located in south-western Rajasthan. Known for its prominent granite hills and the Jawai riverbed, which is seasonal and dry for most of the year. The river basin supports intensive seasonal agriculture.</li>
+                                </ul>
+                            </section>
+                            <section class="report-section">
+                                <h3>3.2 Data Source</h3>
+                                <p>Satellite images were sourced from ISRO's portals:</p>
+                                <ul>
+                                    <li><strong>Bhuvan:</strong> India's Geo-portal providing thematic maps and visualization services.</li>
+                                    <li><strong>Bhunidhi:</strong> ISRO's satellite data dissemination portal. The datasets downloaded correspond to the IRS-LISS-3 sensor from March 2024 and March 2025.</li>
+                                </ul>
+                            </section>
+                            <section class="report-section">
+                                <h3>3.3 Classified Land Cover Categories</h3>
+                                <p>Five distinct LULC categories were mapped:</p>
+                                <ol>
+                                    <li><strong>Sandy Area (Yellow):</strong> Thar desert dunes in Jodhpur, and the sandy dry bed of the Jawai river in Jalore. High reflection across all bands.</li>
+                                    <li><strong>Building Area / Built-up (Red):</strong> Residential, commercial, and industrial settlements. Flat medium-high spectral response.</li>
+                                    <li><strong>Water Body (Blue):</strong> Kaylana Lake in Jodhpur, and water flow in the Jawai river in Jalore. High absorption in Near-Infrared and SWIR bands.</li>
+                                    <li><strong>Vegetation Area (Green):</strong> Agricultural croplands in Jalore basin, and city parks/nurseries in Jodhpur. High reflection peak in NIR.</li>
+                                    <li><strong>Other Area (Grey):</strong> Granite rocky outcrops and barren hills. Medium flat spectral signature.</li>
+                                </ol>
+                            </section>
+                            <section class="report-section">
+                                <h3>3.4 Summary of Classification Results & Change Analysis</h3>
+                                <p>Based on our machine learning classification and temporal change detection, several important trends emerge:</p>
+                                <ul>
+                                    <li><strong>Urban Sprawl in Jodhpur:</strong> Between March 2024 and March 2025, Jodhpur's <em>Building Area</em> shows expansion. This urban sprawl directly consumes surrounding <em>Sandy</em> and <em>Barren (Other)</em> land cover classes.</li>
+                                    <li><strong>Riverbed and Agriculture in Jalore:</strong> The seasonal variation of Jalore is visible. In March 2025, the <em>Water Body</em> area drops, exposing the dry sand bed (classified as <em>Sandy Area</em>), while <em>Vegetation</em> along the riverbanks changes based on winter crop cycles.</li>
+                                </ul>
+                            </section>
+                        </article>
+                        <hr class="report-divider">
+                        <!-- References -->
+                        <article class="report-chapter">
+                            <h2>References</h2>
+                            <ol class="references-list">
+                                <li>Lillesand, T.M., Kiefer, R.W. and Chipman, J.W., 2015. <em>Remote Sensing and Image Interpretation</em>. John Wiley & Sons.</li>
+                                <li>Indian Space Research Organisation (ISRO). <em>Bhuvan Geoportal</em>. Government of India. URL: <a href="https://bhuvan.nrsc.gov.in" target="_blank">bhuvan.nrsc.gov.in</a></li>
+                                <li>ISRO. <em>Bhoonidhi Satellite Data Dissemination Portal</em>. National Remote Sensing Centre (NRSC). URL: <a href="https://bhoonidhi.nrsc.gov.in" target="_blank">bhoonidhi.nrsc.gov.in</a></li>
+                                <li>Jensen, J.R., 2015. <em>Introductory Digital Image Processing: A Remote Sensing Perspective</em>. Prentice Hall.</li>
+                                <li>QGIS Development Team. <em>QGIS Geographic Information System User Guide</em>. Open Source Geospatial Foundation.</li>
+                            </ol>
+                        </article>
+                    </div>
+                </div>
+            </section>
+            <!-- QGIS Tutorial Tab -->
+            <section class="tab-content" id="tab-qgis">
+                <div class="qgis-card card">
+                    <h2><i class="fa-solid fa-map-location"></i> Step-by-Step QGIS Workflow</h2>
+                    <p class="intro-p">To perform this classification in QGIS on real IRS-LISS-3 data downloaded from Bhunidhi, follow this step-by-step tutorial.</p>
+                    
+                    <div class="step-list">
+                        <div class="step-item">
+                            <div class="step-num">1</div>
+                            <div class="step-body">
+                                <h4>Data Acquisition from ISRO Bhunidhi</h4>
+                                <p>Register on the Bhunidhi portal. Use the map tool to draw a bounding box over <strong>Jodhpur</strong> or <strong>Jalore</strong>. Filter by satellite <strong>Resourcesat-2</strong>, sensor <strong>LISS-3</strong>. Choose cloud-free imagery (< 5%) for March 2024 and March 2025. Download the product. You will receive 4 separate TIF band files (Band 2, Band 3, Band 4, and Band 5).</p>
+                            </div>
+                        </div>
+                        <div class="step-item">
+                            <div class="step-num">2</div>
+                            <div class="step-body">
+                                <h4>Install Semi-Automatic Classification Plugin (SCP)</h4>
+                                <p>In QGIS, go to the top menu: <strong>Plugins > Manage and Install Plugins</strong>. Search for <strong>"Semi-Automatic Classification Plugin"</strong> (developed by Luca Congedo). Install the plugin. This adds a new SCP panel to your workspace and a top menu bar.</p>
+                            </div>
+                        </div>
+                        <div class="step-item">
+                            <div class="step-num">3</div>
+                            <div class="step-body">
+                                <h4>Create Band Set and Stack Image</h4>
+                                <p>Open the SCP panel: click on the SCP icon. Go to the <strong>Band Set</strong> tab. Click "Refresh list" and select your 4 downloaded band TIF files (B2, B3, B4, B5). Add them to the band set. Arrange them in ascending order. In the "Quick wavelengths" dropdown, select <strong>"LISS-3"</strong> (which maps B2=Green, B3=Red, B4=NIR, B5=SWIR). Check the option to "Create raster composite" to stack bands into a single multi-band raster.</p>
+                            </div>
+                        </div>
+                        <div class="step-item">
+                            <div class="step-num">4</div>
+                            <div class="step-body">
+                                <h4>Set Visual Composites (TCC & FCC)</h4>
+                                <p>To visualize the stacked raster: right-click the layer, go to <strong>Properties > Symbology</strong>. </p>
+                                <ul>
+                                    <li><strong>False Color Composite (FCC):</strong> Set Red Band = Band 3 (NIR), Green Band = Band 2 (Red), and Blue Band = Band 1 (Green). Vegetation will instantly glow bright red, making analysis easy.</li>
+                                    <li><strong>True Color Composite (TCC):</strong> Set Red Band = Band 2 (Red), Green Band = Band 1 (Green), Blue Band = Band 4 (SWIR or synthesized band). Adjust contrast stretch to Min/Max 2% for maximum clarity.</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="step-item">
+                            <div class="step-num">5</div>
+                            <div class="step-body">
+                                <h4>Collect Training Inputs (ROIs)</h4>
+                                <p>In SCP, click the <strong>Training Input</strong> tab. Click "Create new training input" and save the `.scp` file. In the QGIS toolbar, select the "Create ROI polygon" tool. Draw small polygon samples on the map for each class:</p>
+                                <ul>
+                                    <li><strong>Water Body:</strong> Click inside lake/river (MC_ID=1, MC_name="Water").</li>
+                                    <li><strong>Vegetation:</strong> Click agricultural crops or city parks (MC_ID=2, MC_name="Vegetation").</li>
+                                    <li><strong>Building Area:</strong> Click buildings, asphalt roads (MC_ID=3, MC_name="Builtup").</li>
+                                    <li><strong>Sandy Area:</strong> Click sand dunes or dry river sand (MC_ID=4, MC_name="Sandy").</li>
+                                    <li><strong>Other Area:</strong> Click barren hills and rocks (MC_ID=5, MC_name="Other").</li>
+                                </ul>
+                                <p>Collect 10-15 training polygons distributed across the image for each class. Click "Save ROI" after drawing each polygon.</p>
+                            </div>
+                        </div>
+                        <div class="step-item">
+                            <div class="step-num">6</div>
+                            <div class="step-body">
+                                <h4>Select Classifier and Run Classification</h4>
+                                <p>Go to the SCP menu and select <strong>Band Processing > Classification</strong>. Select the input Band Set. Under algorithm, choose <strong>"Random Forest"</strong> (or Maximum Likelihood). Set parameters: 50-100 trees for Random Forest. Select classification output path and click <strong>"Run"</strong>. QGIS will classify the image and render a color-themed raster layer corresponding to your classes.</p>
+                            </div>
+                        </div>
+                        <div class="step-item">
+                            <div class="step-num">7</div>
+                            <div class="step-body">
+                                <h4>Calculate Areas and Post-Process</h4>
+                                <p>To compute area statistics, go to <strong>SCP > Post-processing > Land cover change</strong> or use the <strong>"Report"</strong> tool inside SCP. Select the classified raster. It outputs a table displaying pixel count, percentage cover, and area in square meters or hectares. You can run this for both years and use the "Land Cover Change" tool to compute a transition matrix, exactly as simulated in our dashboard.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+    <!-- Custom JS -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

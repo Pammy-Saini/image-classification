@@ -249,13 +249,15 @@ The application generates:
 
 ## Change Detection
 
-Screenshot 2026-07-09 115727.png
+<img width="922" height="454" alt="Screenshot 2026-07-09 115701" src="https://github.com/user-attachments/assets/52428dd7-d763-4cd5-80a4-e09be48e88b5" />
+
 
 ---
 
 ## Dashboard / Statistics
 
-Screenshot 2026-07-09 115701.png
+<img width="937" height="401" alt="Screenshot 2026-07-09 115727" src="https://github.com/user-attachments/assets/aa1ff54f-0a92-46ca-91bd-6a5ed2cb36ed" />
+
 
 ## Future Improvements
 

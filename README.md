@@ -249,14 +249,13 @@ The application generates:
 
 ## Change Detection
 
-
+Screenshot 2026-07-09 115727.png
 
 ---
 
 ## Dashboard / Statistics
 
-![Dashboard](screenshots/frame3.png)
-
+Screenshot 2026-07-09 115701.png
 
 ## Future Improvements
 

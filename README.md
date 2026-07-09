@@ -244,21 +244,12 @@ The application generates:
 
 # 📸 Screenshots
 
-## Home Page
 
-![Home Page](screenshots/frame0.png)
 
----
-
-## Classification Result
-
-![Classification Result](screenshots/frame1.png)
-
----
 
 ## Change Detection
 
-![Change Detection](screenshots/frame2.png)
+
 
 ---
 
